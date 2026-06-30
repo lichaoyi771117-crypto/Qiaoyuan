@@ -1,3 +1,5 @@
+[general]
+email = ""
+
 [server]
-port = 8502
-maxUploadSize = 10
+headless = true
