@@ -197,23 +197,30 @@ class MetricCalculator:
 
         判据: Z < 1.81 → 高风险 / 1.81 ≤ Z ≤ 2.99 → 灰色 / Z > 2.99 → 安全
         """
+        components = self.altman_z_components()
+        return components["z_score"]
+
+    def altman_z_components(self) -> dict:
+        """Altman Z-Score 5个分变量明细"""
+        from math import isnan
         ta = self._get("total_assets")
-        if ta == 0:
-            return 0.0
+        if isnan(ta) or ta == 0:
+            return {"z_score": 0.0, "x1": 0, "x2": 0, "x3": 0, "x4": 0, "x5": 0}
         nwc = self._get("total_current_assets", "current_assets") - self._get("total_current_liabilities")
         re_ = self._get("retained_earnings")
         ebit = self._ebit()
-        mve = self._get("total_equity")  # 非上市公司用权益近似市值
+        mve = self._get("total_equity")
         tl = self._get("total_liabilities")
         rev = self._get("revenue")
 
         x1 = nwc / ta
-        x2 = re_ / ta
+        x2 = (0 if isnan(re_) else re_) / ta
         x3 = ebit / ta
         x4 = mve / tl if tl != 0 else 0.0
         x5 = rev / ta
 
-        return 1.2 * x1 + 1.4 * x2 + 3.3 * x3 + 0.6 * x4 + 0.999 * x5
+        z = 1.2 * x1 + 1.4 * x2 + 3.3 * x3 + 0.6 * x4 + 0.999 * x5
+        return {"z_score": z, "x1": x1, "x2": x2, "x3": x3, "x4": x4, "x5": x5}
 
     # ────── 内部辅助 ──────
 
@@ -244,6 +251,7 @@ class MetricCalculator:
 
     def compute_all(self) -> dict[str, dict]:
         """返回 PRD 7大类所有指标及解读"""
+        z_comp = self.altman_z_components()
         return {
             "偿债能力": {
                 "流动比率": {"value": self.current_ratio(), "unit": "倍", "benchmark": ">1"},
@@ -277,7 +285,62 @@ class MetricCalculator:
                 "综合税负率": {"value": self.composite_tax_burden(), "unit": "%", "benchmark": "行业均值"},
             },
             "财务预警": {
-                "Altman Z-score": {"value": self.altman_z_score(), "unit": "",
+                "Altman Z-score": {"value": z_comp["z_score"], "unit": "",
                     "benchmark": ">2.99安全 | 1.81-2.99灰色 | <1.81高风险"},
+                "Z-Score分变量": {"value": z_comp, "unit": "", "note": "x1~x5分变量明细"},
             },
         }
+
+    def compute_enhanced(self, dimensions: list, base_metrics: dict = None) -> dict:
+        """
+        计算增强指标（根据Q2选择动态抽取）
+
+        Args:
+            dimensions: Q2选择的关注维度列表
+            base_metrics: compute_all()的输出（用于组合指标计算）
+
+        Returns:
+            {维度名: {指标中文名: {value, unit, note}}}
+        """
+        from src.enhanced_metrics import EnhancedMetricCalculator
+        calc = EnhancedMetricCalculator(self.df)
+        return calc.compute_by_dimensions(dimensions, base_metrics)
+
+    def compute_growth(self, prior_mapped_df) -> dict:
+        """
+        计算成长能力指标（需上期数据）
+
+        Args:
+            prior_mapped_df: 上期标准化DataFrame
+
+        Returns:
+            {指标名: {value, unit, note}}
+        """
+        from math import isnan
+        results = {}
+
+        # 营收增长率
+        cur_rev = self._get("revenue")
+        pri_rev = float(prior_mapped_df["revenue"].iloc[0]) if "revenue" in prior_mapped_df.columns else float("nan")
+        if not isnan(cur_rev) and not isnan(pri_rev) and pri_rev != 0:
+            results["营收增长率"] = {"value": (cur_rev - pri_rev) / abs(pri_rev), "unit": "%", "note": ""}
+        else:
+            results["营收增长率"] = {"value": float("nan"), "unit": "%", "note": "数据不足"}
+
+        # 净利润增长率
+        cur_np = self._get("net_profit")
+        pri_np = float(prior_mapped_df["net_profit"].iloc[0]) if "net_profit" in prior_mapped_df.columns else float("nan")
+        if not isnan(cur_np) and not isnan(pri_np) and pri_np != 0:
+            results["净利润增长率"] = {"value": (cur_np - pri_np) / abs(pri_np), "unit": "%", "note": ""}
+        else:
+            results["净利润增长率"] = {"value": float("nan"), "unit": "%", "note": "数据不足"}
+
+        # 资本积累率
+        cur_te = self._get("total_equity")
+        pri_te = float(prior_mapped_df["total_equity"].iloc[0]) if "total_equity" in prior_mapped_df.columns else float("nan")
+        if not isnan(cur_te) and not isnan(pri_te) and pri_te != 0:
+            results["资本积累率"] = {"value": (cur_te - pri_te) / abs(pri_te), "unit": "%", "note": ""}
+        else:
+            results["资本积累率"] = {"value": float("nan"), "unit": "%", "note": "数据不足"}
+
+        return results

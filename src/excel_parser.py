@@ -205,3 +205,47 @@ def parse_financial_excel(
     if not result.empty and "科目名称" in result.columns:
         result = result[["科目名称", "金额", "报告期"]]
     return result
+
+
+def parse_multiple_files(file_paths: list, file_labels: list = None) -> dict:
+    """
+    解析多个Excel文件，支持多期报表
+
+    Args:
+        file_paths: 文件路径列表
+        file_labels: 文件标签列表，如 ["本期", "上期"]
+                     如果为None，自动按文件名中的"上年"/"上期"判断
+
+    Returns:
+        {
+            "current": pd.DataFrame,  # 本期数据
+            "prior": pd.DataFrame | None,  # 上期数据（如果有）
+        }
+    """
+    results = {}
+    for i, fp in enumerate(file_paths):
+        label = file_labels[i] if file_labels else _auto_label_period(fp)
+        try:
+            sheets = pd.read_excel(fp, sheet_name=None, header=None)
+            dfs = [parse_financial_excel(fp, sheet_name=s, report_period=label) for s in sheets.keys()]
+            df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+            if not df.empty:
+                results[label] = df
+        except Exception:
+            pass
+
+    current = results.get("本期", results.get("current", None))
+    if current is None and results:
+        # 取第一个作为本期
+        current = list(results.values())[0]
+    prior = results.get("上期", results.get("prior", None))
+
+    return {"current": current, "prior": prior}
+
+
+def _auto_label_period(file_path: str) -> str:
+    """根据文件名自动判断期间标签"""
+    name = str(file_path).lower()
+    if any(kw in name for kw in ["上年", "上期", "prior", "去年", "previous", "上年度"]):
+        return "上期"
+    return "本期"
