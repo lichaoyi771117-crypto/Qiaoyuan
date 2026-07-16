@@ -26,7 +26,6 @@ from src.industry_benchmarks import get_industry_benchmarks, evaluate_metric
 from src.dupont_analyzer import DuPontAnalyzer
 from src.piotroski_scorer import PiotroskiScorer
 from src.app_security import (
-    validate_api_key,
     check_rate_limit,
     validate_uploaded_files,
     safe_user_error,
@@ -41,8 +40,9 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 
 st.set_page_config(page_title="峤远·F-Analyzer | 企业财报AI分析", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# 启动时校验 API Key
-validate_api_key(DEEPSEEK_API_KEY)
+# 校验 API Key 配置（警告但不阻止启动）
+if not DEEPSEEK_API_KEY or not DEEPSEEK_API_KEY.startswith("sk-"):
+    st.warning("⚠️ DEEPSEEK_API_KEY 未配置或格式不正确。请在 .env 文件中设置有效的 API Key，否则 AI 分析功能不可用。")
 
 # ═══════════════════════════════════════════════════════════
 # 全局样式（必须在协议门禁之前注入，确保CSS生效）
