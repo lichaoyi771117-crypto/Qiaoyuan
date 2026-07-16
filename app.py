@@ -25,10 +25,24 @@ from src.report_generator import ReportGenerator, markdown_to_docx, professional
 from src.industry_benchmarks import get_industry_benchmarks, evaluate_metric
 from src.dupont_analyzer import DuPontAnalyzer
 from src.piotroski_scorer import PiotroskiScorer
+from src.app_security import (
+    validate_api_key,
+    check_rate_limit,
+    validate_uploaded_files,
+    safe_user_error,
+    secure_delete,
+    LLM_TIMEOUT_SECONDS,
+    MAX_UPLOAD_FILES,
+    MAX_SINGLE_FILE_SIZE,
+    MAX_TOTAL_UPLOAD_SIZE,
+)
 
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 
 st.set_page_config(page_title="峤远·F-Analyzer | 企业财报AI分析", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
+
+# 启动时校验 API Key
+validate_api_key(DEEPSEEK_API_KEY)
 
 # ═══════════════════════════════════════════════════════════
 # 全局样式（必须在协议门禁之前注入，确保CSS生效）
@@ -132,9 +146,9 @@ _CONSENT_TEMPLATE = """<div style='font-family:"Microsoft YaHei","宋体",SimSun
 <h3 style='font-size:16px; margin-top:28px; border-bottom:1px solid #ddd; padding-bottom:4px;'>第七条 联系方式</h3>
 <table style='width:100%; border-collapse:collapse; margin:12px 0;'>
 <tr><td style='border:1px solid #ddd; padding:8px; font-weight:bold; width:120px;'>运营主体</td><td style='border:1px solid #ddd; padding:8px;'>昆明霖信莯科技有限公司</td></tr>
-<tr><td style='border:1px solid #ddd; padding:8px; font-weight:bold;'>联系人</td><td style='border:1px solid #ddd; padding:8px;'>余磊</td></tr>
-<tr><td style='border:1px solid #ddd; padding:8px; font-weight:bold;'>联系电话</td><td style='border:1px solid #ddd; padding:8px;'>13987671259</td></tr>
-<tr><td style='border:1px solid #ddd; padding:8px; font-weight:bold;'>电子邮箱</td><td style='border:1px solid #ddd; padding:8px;'>425448719@qq.com</td></tr>
+<tr><td style='border:1px solid #ddd; padding:8px; font-weight:bold;'>联系人</td><td style='border:1px solid #ddd; padding:8px;'>[请联系客服获取]</td></tr>
+<tr><td style='border:1px solid #ddd; padding:8px; font-weight:bold;'>联系电话</td><td style='border:1px solid #ddd; padding:8px;'>[请联系客服获取]</td></tr>
+<tr><td style='border:1px solid #ddd; padding:8px; font-weight:bold;'>电子邮箱</td><td style='border:1px solid #ddd; padding:8px;'>[请联系客服获取]</td></tr>
 </table>
 <hr style='margin:24px 0;'/>
 <p style='text-align:center; font-size:12px; color:#888;'>&copy; 2026 昆明霖信莯科技有限公司 保留一切权利</p>
@@ -215,6 +229,7 @@ def classify_file_with_llm(file_content: bytes, filename: str) -> str:
             ],
             temperature=0.1,
             max_tokens=20,
+            timeout=LLM_TIMEOUT_SECONDS,
         )
         result = response.choices[0].message.content.strip()
         valid = {"资产负债表", "利润表", "现金流量表", "所有者权益变动表", "其他"}
@@ -242,10 +257,22 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True,
     key=f"fu_{st.session_state.upload_key}",
     label_visibility="collapsed",
+    help=f"单文件不超过 {MAX_SINGLE_FILE_SIZE // 1024 // 1024} MB，一次最多 {MAX_UPLOAD_FILES} 个文件，总大小不超过 {MAX_TOTAL_UPLOAD_SIZE // 1024 // 1024} MB",
 )
+
+# 校验上传文件
+if uploaded_files:
+    ok, err, valid_files = validate_uploaded_files(uploaded_files)
+    if not ok:
+        st.error(err)
+        st.stop()
+    uploaded_files = valid_files
 
 # AI分拣
 if uploaded_files and not st.session_state.classified_files:
+    if not check_rate_limit("classify", max_calls=10, window_seconds=60):
+        st.warning("文件识别请求过于频繁，请稍后再试。")
+        st.stop()
     st.session_state.classified_files = []
     with st.spinner("🔍 AI正在识别文件类型..."):
         for uf in uploaded_files:
@@ -296,6 +323,9 @@ st.markdown("---")
 do_generate = st.button("🚀 一键生成分析报告", type="primary", use_container_width=True, key="gen_btn")
 
 if do_generate:
+    if not check_rate_limit("analyze", max_calls=5, window_seconds=60):
+        st.warning("分析请求过于频繁，请稍后再试。")
+        st.stop()
     if not st.session_state.classified_files:
         st.warning("请先上传至少一份财务报表文件。")
     elif not st.session_state.processing_done:
@@ -318,7 +348,7 @@ if do_generate:
                             else:
                                 all_dfs.append(df)
                 finally:
-                    os.unlink(tmp_path)
+                    secure_delete(tmp_path)
 
             if not all_dfs:
                 st.error("未能提取到财务数据，请检查文件格式。")
@@ -389,21 +419,25 @@ if do_generate:
 
         # 生成报告
         with st.spinner("🚀 峤远主脑协议正在生成双版本报告（约1-2分钟）..."):
-            gen = ReportGenerator(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com", model="deepseek-chat")
-            st.session_state.report = gen.generate(
-                ratios=ratios,
-                mapped_df=mapped_df,
-                check_results=check_results,
-                analysis_goal=q3 if not skip_calibration else "总体体检",
-                report_period=", ".join(cf["name"] for cf in st.session_state.classified_files),
-                calibration=st.session_state.calibration,
-                enhanced_metrics=enhanced_metrics,
-                model_results=model_results,
-                prior_ratios=prior_ratios,
-                growth_metrics=growth_metrics,
-                industry=q1.replace("（通用基准）", "").strip() if not skip_calibration else "其他",
-            )
-            st.session_state.processing_done = True
+            try:
+                gen = ReportGenerator(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com", model="deepseek-chat")
+                st.session_state.report = gen.generate(
+                    ratios=ratios,
+                    mapped_df=mapped_df,
+                    check_results=check_results,
+                    analysis_goal=q3 if not skip_calibration else "总体体检",
+                    report_period=", ".join(cf["name"] for cf in st.session_state.classified_files),
+                    calibration=st.session_state.calibration,
+                    enhanced_metrics=enhanced_metrics,
+                    model_results=model_results,
+                    prior_ratios=prior_ratios,
+                    growth_metrics=growth_metrics,
+                    industry=q1.replace("（通用基准）", "").strip() if not skip_calibration else "其他",
+                )
+                st.session_state.processing_done = True
+            except Exception:
+                st.error(safe_user_error())
+                st.stop()
         st.rerun()
 
 # ═══════════════════════════════════════════════════════════
@@ -647,7 +681,7 @@ if st.session_state.processing_done and st.session_state.report:
                 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
     st.caption(f"峤远·F-Analyzer V2.0 ｜ 主脑协议V1.0驱动 ｜ {cal.get('q3_purpose', '总体体检')} ｜ {fl}")
-    st.caption("开发人员：李超逸、李屹泉")
+    st.caption("本系统为财务分析辅助工具，输出不构成正式财务意见或融资承诺")
 
 else:
     # 未生成报告时显示操作指引

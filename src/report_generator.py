@@ -172,7 +172,7 @@ _DISCLAIMER_PRO = """**免责与合规声明**
 5. 重大财务决策请咨询持牌专业顾问，霖信莯咨询可提供人工复核服务。
 
 ---
-**系统开发人员：李超逸、李屹泉**"""
+**财务分析辅助工具，输出不构成正式财务意见或融资承诺**"""
 
 _DISCLAIMER_PLAIN = """---
 📋 声明：这份报告是AI自动生成的，里面的数字是算出来的（准），但解读是AI写的（可能不完全准）。如果你要做重大决定（比如贷款、投资），建议找个有证的会计师再确认一下。"""
@@ -683,11 +683,12 @@ class ReportGenerator:
                 ],
                 temperature=0.7,
                 max_tokens=max_tokens,
+                timeout=120,
             )
             return response.choices[0].message.content
-        except Exception as e:
-            _logger.warning(f"LLM生成失败: {e}")
-            return f"[LLM调用失败: {e}]\n\n请检查API连接。"
+        except Exception:
+            _logger.warning("LLM 调用失败，已脱敏处理")
+            return "[模型调用失败，请稍后重试]"
 
     # ═══════════════════════════════════════════════════════════
     # 格式化工具

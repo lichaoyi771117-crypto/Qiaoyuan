@@ -9,3 +9,8 @@ __pycache__/
 skills-lock.json
 skills/
 memory/
+
+# 敏感数据：真实财务报表、授权密钥文件、GitHub token 文件
+test documents/
+Key.txt
+*token*.txt
