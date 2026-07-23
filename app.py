@@ -38,7 +38,7 @@ from src.app_security import (
 
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 
-st.set_page_config(page_title="峤远·F-Analyzer | 企业财报AI分析", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="财析通·AI财务报表分析", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
 # 校验 API Key 配置（警告但不阻止启动）
 if not DEEPSEEK_API_KEY or not DEEPSEEK_API_KEY.startswith("sk-"):
@@ -79,12 +79,12 @@ def render_product_intro():
     """产品介绍区域 — 在协议条款上方展示，宽度略宽于协议(960px vs 900px)"""
     st.markdown("""<div style="max-width:960px;margin:0 auto;">
 <div class="main-header">
-<h1>📊 峤远 · 企业财务报表AI分析</h1>
-<p>霖信莯咨询 · F-Analyzer V2.0 ｜ 主脑协议V1.0驱动 ｜ 双版本报告 ｜ 三模型固化</p>
+<h1>📊 财析通·AI财务报表分析</h1>
+<p>霖信莯咨询 · 财析通 V2.0 ｜ 双版本报告 ｜ 三模型固化</p>
 </div>
 <div class="product-card">
-<h4>🔍 峤远是什么？</h4>
-<p>峤远是一个<b>CFO级AI财务专家</b>，拥有财务分析+税务筹划+融资顾问+法务合规四栈专业能力。你上传财务报表，它帮你算出20+核心指标、跑通三个经典财务模型（杜邦分析/破产预测/财务质量评分），输出<b>专业版</b>和<b>大白话版</b>两份分析报告，还给出针对性的优化改进建议。</p>
+<h4>🔍 财析通是什么？</h4>
+<p>财析通是一个<b>CFO级AI财务专家</b>，拥有财务分析+税务筹划+融资顾问+法务合规四栈专业能力。你上传财务报表，它帮你算出20+核心指标、跑通三个经典财务模型（杜邦分析/破产预测/财务质量评分），输出<b>专业版</b>和<b>大白话版</b>两份分析报告，还给出针对性的优化改进建议。</p>
 </div>
 <div style="display:flex;gap:12px;margin:8px 0;">
 <div class="product-card" style="flex:1;">
@@ -113,19 +113,19 @@ def render_product_intro():
 # ═══════════════════════════════════════════════════════════
 
 _CONSENT_TEMPLATE = """<div style='font-family:"Microsoft YaHei","宋体",SimSun,serif; font-size:14px; line-height:2.0; color:#222; max-width:900px; margin:0 auto;'>
-<h2 style='text-align:center; font-size:20px; font-weight:bold; margin-bottom:8px;'>霖信莯咨询 · 峤远 F-Analyzer<br/>用户授权与服务协议</h2>
+<h2 style='text-align:center; font-size:20px; font-weight:bold; margin-bottom:8px;'>霖信莯咨询 · 财析通·AI财务报表分析<br/>用户授权与服务协议</h2>
 <p style='text-align:center; font-size:12px; color:#888; margin-bottom:24px;'>
 版本：v2.0 &nbsp;|&nbsp; 更新日期：2026年7月11日<br/>
-运营主体：昆明霖信莯科技有限公司（以下简称"霖信莯"或"本公司"）
+运营主体：昆明霖信莯科技有限公司（以下简称"霖信莯"或"本公司"）｜ 开发团队：李超逸、李屹泉
 </p>
 <div style='background:#fff3e0; border-left:4px solid #e65100; padding:16px; margin:16px 0; border-radius:4px;'>
 <p style='font-weight:bold; color:#e65100; margin:0 0 8px 0;'>⚠️ 重要提示</p>
-<p style='margin:4px 0;'><b>尊敬的用户</b>：感谢您选择霖信莯咨询开发的峤远 F-Analyzer 企业财务报表AI分析系统。本系统基于峤远主脑协议V1.0驱动，提供专业版和大白话版双版本财务分析报告。</p>
+<p style='margin:4px 0;'><b>尊敬的用户</b>：感谢您选择霖信莯咨询开发的财析通·AI财务报表分析系统。本系统基于双版本大模型引擎驱动，提供专业版和大白话版双版本财务分析报告。</p>
 <p style='margin:4px 0;'><b style='color:#d32f2f;'>本系统输出的分析报告仅供商业决策参考，不构成正式的财务建议、税务意见或融资承诺。如需专业意见，请咨询持有相应资质的注册会计师、税务师或金融机构。</b></p>
 <p style='margin:4px 0;'><b>本协议适用中华人民共和国法律。</b></p>
 </div>
 <h3 style='font-size:16px; margin-top:28px; border-bottom:1px solid #ddd; padding-bottom:4px;'>第一条 定义与解释</h3>
-<p><b>1.1 本系统</b>：指霖信莯开发并运营的"峤远 F-Analyzer 企业财务报表AI分析系统"，包括其全部功能模块、算法模型、用户界面及相关文档。</p>
+<p><b>1.1 本系统</b>：指霖信莯开发并运营的"财析通·AI财务报表分析系统"，包括其全部功能模块、算法模型、用户界面及相关文档。</p>
 <p><b>1.2 财务文件</b>：指用户上传至本系统的 Excel、PDF 或其他格式的财务报表、账目数据及相关附件。</p>
 <p><b>1.3 输出报告</b>：指本系统基于用户上传的财务文件，通过AI算法处理后生成的财务分析报告，包括专业版和大白话版两个版本。</p>
 <p><b>1.4 AI模型</b>：指本系统调用的第三方大语言模型（DeepSeek API），用于执行财务数据解读、风险识别等任务。<b style='color:#c62828;'>AI模型仅接收经本地处理后的财务摘要数据，不发送原始文件全文</b>。</p>
@@ -418,7 +418,7 @@ if do_generate:
         )
 
         # 生成报告
-        with st.spinner("🚀 峤远主脑协议正在生成双版本报告（约1-2分钟）..."):
+        with st.spinner("🚀 财析通正在生成双版本报告（约1-2分钟）..."):
             try:
                 gen = ReportGenerator(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com", model="deepseek-chat")
                 st.session_state.report = gen.generate(
@@ -680,8 +680,9 @@ if st.session_state.processing_done and st.session_state.report:
                 st.markdown(f"**{cat_name}**")
                 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
-    st.caption(f"峤远·F-Analyzer V2.0 ｜ 主脑协议V1.0驱动 ｜ {cal.get('q3_purpose', '总体体检')} ｜ {fl}")
+    st.caption(f"财析通·AI财务报表分析 V2.0 ｜ {cal.get('q3_purpose', '总体体检')} ｜ {fl}")
     st.caption("本系统为财务分析辅助工具，输出不构成正式财务意见或融资承诺")
+    st.caption("开发团队：李超逸、李屹泉")
 
 else:
     # 未生成报告时显示操作指引
